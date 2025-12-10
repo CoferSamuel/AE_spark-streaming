@@ -1,0 +1,57 @@
+# =============================================================================
+# ARQUITECTURA DE STREAMING: ZOOKEEPER + KAFKA
+# Autores: Grupo de Streaming
+# Descripción: Este archivo levanta un clúster distribuido simulado en Docker.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # SERVICIO 1: ZOOKEEPER (El Coordinador)
+  # Kafka no puede funcionar solo; necesita a Zookeeper para gestionar el clúster.
+  # Se encarga de elegir el líder, guardar la configuración y saber qué nodos están vivos.
+  # ---------------------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.4  # Imagen oficial de Confluent (muy estable)
+    hostname: zookeeper
+    container_name: zookeeper  # Nombre fijo para que Kafka lo encuentre por DNS interno
+    ports:
+      - "2181:2181"  # Puerto estándar de administración (PC:Contenedor)
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181  # Puerto donde Kafka buscará a Zookeeper
+      ZOOKEEPER_TICK_TIME: 2000    # "Latido" del corazón del sistema (en ms)
+
+  # ---------------------------------------------------------------------------
+  # SERVICIO 2: KAFKA (El Buzón / Broker)
+  # Es el sistema de mensajería. Recibe datos (Productor) y los sirve (Spark).
+  # ---------------------------------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.4.4
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper  # Orden a Docker: "¡No arranques Kafka hasta que Zookeeper esté listo!"
+    ports:
+      - "9092:9092"  # El puerto CRÍTICO. Aquí se conectarán vuestros scripts de Python.
+    
+    environment:
+      # Identificador único de este nodo de Kafka dentro del clúster
+      KAFKA_BROKER_ID: 1
+      
+      # Conexión interna con el jefe (Zookeeper).
+      # Fíjate que usa el nombre "zookeeper" en vez de una IP. Docker lo resuelve mágicamente.
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      
+      # --- CONFIGURACIÓN DE RED (La parte más importante para vosotros) ---
+      # Esto le dice a Kafka qué dirección IP debe "anunciar" al mundo exterior.
+      # Le dice a vuestros scripts: "Si queréis hablar conmigo, buscadme en localhost:9092".
+      # Sin esto, intentaría dar una IP interna de Docker y la conexión fallaría desde vuestro PC.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      
+      # Define el protocolo de seguridad. Usamos PLAINTEXT (sin contraseña) para facilitar el desarrollo.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      
+      # --- CONFIGURACIÓN DE REPLICACIÓN ---
+      # Por defecto, Kafka intenta hacer 3 copias de todo para seguridad.
+      # Como solo tenemos 1 nodo (tu ordenador), le obligamos a que se conforme con 1 copia.
+      # Si no ponemos esto a 1, Kafka se quedaría esperando eternamente a otros nodos.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1

@@ -1,0 +1,20 @@
+# Archivos de sistema y logs
+.DS_Store
+*.log
+
+# Python - Archivos compilados y temporales
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+venv/
+env/
+
+# Docker - Datos persistentes (¡MUY IMPORTANTE!)
+# No queremos subir los gigas de datos de Kafka a GitHub
+kafka_data/
+zookeeper_data/
+checkpoint/
+
+# IDEs
+.vscode/
+.idea/
