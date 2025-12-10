@@ -137,3 +137,32 @@ sudo docker compose down
 -----
 
 *Arquitectura configurada por la Persona A.*
+
+-----
+
+## 🐦 Módulo: Generador de Datos (Producer)
+
+**Estado:** ✅ Implementado por Persona B.
+
+Este módulo sustituye a la API real de Twitter/X. Su función es generar **tráfico sintético** constante para asegurar que siempre haya datos entrando al sistema durante la demostración, evitando bloqueos por límites de API o pagos.
+
+### 🏃🏻‍♂️ Cómo ejecutar el simulador
+
+Una vez levantada la infraestructura (Docker), abre una terminal nueva y ejecuta:
+
+# Desde la raíz del proyecto
+python src/producer/producer.py
+
+---------------------------------------------------------------------
+INSTRUCCIONES DE VERIFICACIÓN RÁPIDA
+---------------------------------------------------------------------
+Si queréis comprobar que mi parte funciona sin arrancar Spark todavía:
+
+1. Abrid una terminal en la raíz del proyecto y lanzad mi script:
+   Command: python src/producer/producer.py
+
+2. Abrid OTRA terminal para ver lo que llega a Kafka (Buzón):
+   Command: docker exec -it kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic tweets_topic --from-beginning
+
+NOTA: El paso 2 es solo para testear. Cuando la Persona C tenga el código de Spark listo, 
+usaremos Spark para leer, no este comando de consola.
