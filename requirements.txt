@@ -1,0 +1,4 @@
+# Dependencias necesarias para ejecutar el pipeline desde el entorno conda "arqesp"
+pyspark==3.5.4
+kafka-python
+pandas

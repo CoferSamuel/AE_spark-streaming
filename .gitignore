@@ -18,3 +18,9 @@ checkpoint/
 # IDEs
 .vscode/
 .idea/
+
+# Jupyter Notebook - Archivos de salida y checkpoints
+*.ipynb_checkpoints
+
+# Data - Archivos de datos generados
+data/

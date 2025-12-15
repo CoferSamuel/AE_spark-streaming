@@ -15,6 +15,8 @@ Antes de tocar nada, entiende qué es cada carpeta y archivo:
   * **`src/consumer/`**: 📥 **Consumidor.** Código fuente para procesar los mensajes (Spark, etc.).
   * **`src/utils/`**: 🛠️ **Utilidades.** Funciones auxiliares y configuración.
   * **`tests/tester.py`**: 🧪 **Test.** Script de prueba para verificar la conexión con Kafka.
+  * **`data/`**: 📁 **Datos.** Guarda ejemplos pequeños, dumps o logs que uses para pruebas locales.
+  * **`requirements.txt`**: 📦 **Dependencias versionadas.** La lista que usamos dentro del entorno `arqesp`.
   * **`.gitignore`**: 🗑️ **Filtro.** Archivos ignorados por Git.
   * **`README.md`**: 📖 **Documentación principal.**
 
@@ -33,6 +35,8 @@ AE_spark-streaming/
 │   └── utils/
 ├── tests/
 │   └── tester.py
+├── data/
+├── requirements.txt
 ├── README.md
 └── .gitignore
 ```
@@ -73,9 +77,11 @@ conda create --name arqesp python=3.9 -y
 # Activar el entorno
 conda activate arqesp
 
-# Instalar la librería para hablar con Kafka
-pip install kafka-python
+# Instalar las dependencias versionadas del proyecto
+pip install -r requirements.txt
 ```
+
+Además asegúrate de que Java 11 o 17 esté instalada y disponible en `PATH`, ya que PySpark necesita la JVM para arrancar.
 
 ### 3\. Levantar la Infraestructura (Docker)
 
