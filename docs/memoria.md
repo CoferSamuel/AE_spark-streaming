@@ -256,6 +256,63 @@ Este test fue crítico para identificar problemas de configuración antes de emp
 
 **Responsable:** Yahya El Baroudi El Ouazghari
 
+Yahya El Baroudi El Ouazghari ha asumido el rol de Responsable de Documentación e Integración.
+Como responsable de la documentación, el objetivo principal ha sido traducir la complejidad técnica de la infraestructura (Docker) y el código (Python/Spark) en un entregable claro, reproducible y educativo. En un proyecto de Big Data, la documentación actúa como el puente que permite que el trabajo técnico sea comprendido y evaluado correctamente, cumpliendo con los criterios de evaluación que otorgan un gran peso a este apartado.
+
+
+Para cumplir con los requisitos de la asignatura, se ha diseñado una estrategia de presentación híbrida y se ha elaborado tanto la guía de ejecución como el material de defensa.
+
+1. **Estrategia Híbrida: Scripts vs. Notebooks**
+Uno de los desafíos principales ha consistido en adaptar una arquitectura de streaming real (que habitualmente funciona con scripts .py en servidores) al formato académico solicitado.
+
+Según los requerimientos de la asignatura, se exigía un "Caso práctico comentado en detalle utilizando Google Colab o Jupyter". Sin embargo, ejecutar servicios de infraestructura como Kafka dentro de un entorno de celdas (Notebook) presenta problemas de bloqueo en los bucles de ejecución.
+
+
+Para solucionar esta problemática, se ha estructurado el proyecto en dos niveles:
+
+  - **Nivel de Producción** (src/): Se mantiene el código limpio en archivos .py (producer.py y consumer.py), demostrando capacidad de desarrollo de software profesional.
+
+  - **Nivel de Presentación** (Notebook.ipynb): Se ha creado un "Notebook Maestro" que orquesta todo el proyecto. Este cuaderno no solo contiene código, sino que utiliza celdas Markdown para explicar paso a paso la teoría detrás de cada bloque, actuando como una memoria interactiva ejecutable.
+
+2. **Implementación del Notebook Maestro**
+El Notebook entregable integra las tres partes del proyecto en un solo flujo visual. Se han implementado soluciones técnicas específicas para hacer esto posible:
+
+  - **Orquestación desde Jupyter**: Se utilizan comandos mágicos (!docker compose) para controlar la infraestructura desarrollada por Samuel directamente desde el navegador.
+
+  - **Ejecución en Segundo Plano (Background)**: Para el Generador de Datos de Ismael, se implementó el uso de la librería subprocess. Esto permite lanzar el productor en un hilo paralelo sin bloquear la celda de ejecución, posibilitando que el notebook continúe hacia la sección de Spark.
+
+  - **Visualización en Vivo**: Para el consumidor de Jairo, se configuró una salida visual utilizando IPython.display y Pandas. En lugar de imprimir texto plano infinito en la consola, el notebook muestra una tabla HTML dinámica que se actualiza y refresca cada 5 segundos con los nuevos Trending Topics, ofreciendo una experiencia de usuario superior.
+
+3. **Guía de Despliegue (Manual de Usuario)**
+Se ha elaborado el archivo README.md del repositorio, el cual sirve como manual de instrucciones para cualquier persona que desee replicar el proyecto. La guía se resume en tres pasos críticos para garantizar la reproducibilidad:
+
+  - **Prerrequisitos**: Instalación de Docker Desktop y Anaconda, así como la creación del entorno virtual arqesp para aislar las librerías pyspark y kafka-python.
+
+  - **Orden de Ejecución** (Start-up Sequence): Se documentó la importancia estricta del orden de encendido:
+
+    - **1º Infraestructura** (Docker) -> Espera de 30s de "calentamiento".
+
+    - **2º Productor** (Generar datos).
+
+    - **3º Consumidor** (Procesar datos).
+
+  - **Gestión de Errores**: Se incluyó una sección de "Troubleshooting" en la documentación para resolver problemas comunes, tales como la falta de memoria en Docker o conflictos de puertos con servicios de Windows.
+
+Gracias a esta documentación, el proyecto no es solo un código funcional en un entorno local específico, sino un sistema robusto capaz de ser desplegado y evaluado en cualquier máquina con Docker instalado.
+
+4. **Elaboración del Material de Defensa (Presentación)**
+Para cumplir con el requerimiento de "Defensa pública mediante presentación" especificado en la guía docente, se ha diseñado y estructurado el material visual de apoyo.
+
+Esta presentación ha sido elaborada con un enfoque ejecutivo, sintetizando las horas de trabajo técnico en una exposición clara. El documento de diapositivas incluye:
+
+  - **Diagramas de Arquitectura**: Simplificación visual de la comunicación entre Docker, Kafka y Spark.
+
+  - **Justificación Tecnológica**: Explicación comparativa de por qué se eligió Streaming frente a procesamiento Batch tradicional.
+
+  - **Evidencias de Funcionamiento**: Capturas de pantalla del sistema en operación para respaldar la demostración en vivo ante posibles fallos del directo ("Efecto Demo").
+
+De esta forma, se entrega no solo la documentación técnica exhaustiva (Notebook y código fuente), sino también un soporte visual adecuado para la comunicación efectiva de los resultados.
+
 
 ## Conclusiones
 
