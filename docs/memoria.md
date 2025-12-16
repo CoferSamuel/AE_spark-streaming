@@ -243,8 +243,99 @@ Este test fue crítico para identificar problemas de configuración antes de emp
 
 **Responsable:** Ismael González Loro
 
+Tras establecer la infraestructura base (Docker y Kafka), el siguiente reto fue alimentar el sistema. En una arquitectura Big Data, el "pipeline" o tubería de procesamiento no sirve de nada si no tiene un flujo de entrada constante.
 
----
+Mi misión como **Responsable de la Ingesta** fue crear la "realidad simulada": un generador de tráfico que emule el comportamiento de usuarios de una red social (tipo Twitter/X) en tiempo real, garantizando que el clúster de Spark siempre tenga datos que procesar.
+
+### 2.1. Estrategia: ¿Por qué un simulador y no la API real?
+
+Inicialmente se valoró conectar con la API oficial de Twitter (X). Sin embargo, se optó por desarrollar un **Generador Sintético (Synthetic Data Generator)** por tres razones técnicas y operativas:
+
+1.  **Independencia y Resiliencia:** Las APIs públicas tienen límites de tasa (*rate-limits*) y costes asociados. Un simulador nos permite generar tráfico infinito sin bloqueos, asegurando que la demostración en vivo no falle por causas externas.
+2.  **Control del Dato:** Para probar las capacidades de Spark Streaming (agrupaciones y ventanas de tiempo), necesitábamos asegurar que ciertos hashtags (ej: `#Spark`) aparecieran con más frecuencia que otros. Un generador sintético nos permite "trucar" las probabilidades para hacer la demo más visual.
+3.  **Velocidad Ajustable:** Podemos acelerar o frenar el flujo de datos modificando una simple variable de tiempo (`sleep`), algo imposible con datos reales.
+
+### 2.2. Diseño Técnico del Productor
+
+El componente desarrollado es un script en Python (`producer.py`) que implementa el patrón de diseño **Producer** de Kafka.
+
+#### A. Librerías y Conexión
+
+Se utilizó la librería `kafka-python` por su robustez y simplicidad. El script se conecta al "Broker" expuesto por Docker en `localhost:9092`.
+
+Una decisión clave fue la **Serialización**. Kafka transmite bytes puros, por lo que el productor se encarga de transformar nuestros objetos Python (diccionarios) a formato JSON y codificarlos en UTF-8 antes del envío.
+
+```python
+# Configuración del Serializador en el Producer
+producer = KafkaProducer(
+    bootstrap_servers=['localhost:9092'],
+    value_serializer=lambda x: json.dumps(x).encode('utf-8') # Diccionario -> JSON Bytes
+)
+```
+
+#### B. Estructura del Dato (Schema)
+
+Para facilitar el trabajo del **Consumidor (Persona C)**, diseñé un esquema de datos JSON limpio pero enriquecido. En lugar de enviar solo texto plano, enviamos una estructura estructurada:
+
+  * **`usuario`**: Simula quién escribe.
+  * **`texto`**: La frase completa (ej: "estoy aprendiendo mucho con \#Spark").
+  * **`hashtag_principal`**: Aquí apliqué una lógica de pre-procesamiento. Aunque el hashtag está en el texto, lo envío también en un campo separado. Esto permite a Spark hacer el `groupBy` directamente sin necesidad de expresiones regulares complejas, optimizando el rendimiento.
+  * **`timestamp`**: Marca de tiempo para posibles análisis de latencia.
+
+### 2.3. Implementación del Algoritmo
+
+El núcleo del generador reside en un bucle infinito que construye mensajes aleatorios mediante listas predefinidas.
+
+**Fragmento destacado del código (`producer.py`):**
+
+```python
+def generador_tweets():
+    # Listas de componentes aleatorios
+    usuarios = ["@DataFan", "@SparkGuru", "@PythonDev"]
+    hashtags = ["#Spark", "#BigData", "#RealTime", "#IA"]
+    frases = ["increíble la velocidad de", "mañana examen de", "proyecto sobre"]
+    
+    # Selección aleatoria (Randomness)
+    usuario = random.choice(usuarios)
+    hashtag = random.choice(hashtags)
+    frase = random.choice(frases)
+    
+    # Construcción del objeto JSON
+    return {
+        "usuario": usuario,
+        "texto": f"{frase} {hashtag}",
+        "hashtag_principal": hashtag, # Campo optimizado para Spark
+        "timestamp": time.time()
+    }
+
+# Bucle de emisión
+while True:
+    tweet = generador_tweets()
+    producer.send('tweets_topic', value=tweet)
+    time.sleep(1) # Simulación de ritmo humano (1 tweet/seg)
+```
+
+### 2.4. Validación y Pruebas de Integración
+
+Antes de entregar el testigo a la fase de procesamiento, verifiqué la correcta inyección de datos en el bus de mensajería.
+
+Al no tener aún el consumidor de Spark listo, utilicé las herramientas nativas de Kafka dentro del contenedor Docker para "espiar" el topic `tweets_topic` y confirmar la llegada de los JSONs.
+
+**Comando de validación utilizado:**
+
+```bash
+docker exec -it kafka kafka-console-consumer \
+    --bootstrap-server localhost:9092 \
+    --topic tweets_topic \
+    --from-beginning
+```
+
+
+-----
+
+**Conclusión de la Fase B:**
+El sistema de ingesta es operativo y autónomo. Genera un flujo continuo de datos estructurados, desacoplando la generación del procesamiento y cumpliendo con los requisitos de la arquitectura Lambda propuesta.
+
 
 ## Procesamiento con Spark (Consumer)
 
