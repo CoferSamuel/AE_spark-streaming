@@ -250,7 +250,212 @@ Este test fue crítico para identificar problemas de configuración antes de emp
 
 **Responsable:** Jairo Pabel Farfán Callau
 
----
+El rol del consumidor es transformar el flujo bruto de mensajes de Kafka en información agregada sobre _trending topics_ en tiempo (casi) real. Mientras que el productor simula una “red social” generando tweets con hashtags, el consumidor con Spark Structured Streaming se encarga de:
+
+*   Leer continuamente esos mensajes desde Kafka.
+    
+*   Parsear el JSON para extraer el hashtag\_principal.
+    
+*   Contar apariciones por hashtag en ventanas de tiempo.
+    
+*   Mostrar cada pocos segundos un ranking actualizado de los hashtags más usados.
+    
+
+Todo esto se implementa en el script src/spark\_consumer.py, utilizando **PySpark** y el conector oficial **spark-sql-kafka-0-10**.
+
+### 1\. Objetivo del consumidor
+
+El objetivo principal del consumidor es **calcular y mostrar los hashtags más utilizados en la última ventana de tiempo**, imitando el funcionamiento de un sistema de “trending topics”:
+
+*   Se define una **ventana fija de 60 segundos** (un minuto “simulado” de red social).
+    
+*   Cada **10 segundos** se recalculan los conteos de hashtags de ese minuto.
+    
+*   La salida es una tabla ordenada de mayor a menor número de apariciones.
+    
+
+De esta forma se consigue un compromiso razonable entre:
+
+*   _Estabilidad_ del ranking (se mantiene el histórico de un minuto completo).
+    
+*   _Reactividad_ (la tabla se actualiza cada 10 segundos).
+    
+
+### 2\. Lectura del flujo desde Kafka
+
+Para consumir los mensajes, se inicializa una sesión de Spark y se configura una **fuente de streaming Kafka** apuntando al mismo topic que usa el productor (tweets\_topic):
+
+```yaml
+raw_df = (
+    spark.readStream
+        .format("kafka")
+        .option("kafka.bootstrap.servers", "localhost:9092")
+        .option("subscribe", "tweets_topic")
+        .option("startingOffsets", "latest")
+        .load()
+)
+```
+
+Puntos clave:
+
+*   startingOffsets = "latest" indica que el consumidor solo procesa **mensajes nuevos** a partir del momento en que se arranca, sin re-leer históricos anteriores.
+    
+*   La columna value llega en binario, por lo que se castea a STRING para poder parsear el JSON enviado por el productor.
+    
+
+### 3\. Modelo de datos y parseo del JSON
+
+El productor envía mensajes JSON con esta estructura simplificada:
+
+```yaml
+{
+  "usuario": "User_X",
+  "texto": "mensaje de ejemplo",
+  "hashtag_principal": "#BigData",
+  "timestamp": 1733940000.0
+}
+```
+
+En el consumidor se define un **schema explícito** en PySpark y se realiza el parseo:
+
+```yaml
+schema = StructType([
+    StructField("usuario", StringType(), True),
+    StructField("texto", StringType(), True),
+    StructField("hashtag_principal", StringType(), True),
+    StructField("timestamp", DoubleType(), True),
+])
+
+
+value_df = raw_df.selectExpr("CAST(value AS STRING) as json_str")
+
+
+parsed_df = (
+    value_df
+    .select(from_json(col("json_str"), schema).alias("data"))
+    .select("data.*")
+)
+```
+
+Después se limpian posibles valores nulos y se añade una marca de tiempo de procesamiento que servirá para las ventanas temporales:
+
+```yaml
+df_with_ts = (
+    parsed_df
+    .where(col("hashtag_principal").isNotNull())
+    .withColumn("ts", current_timestamp())
+)
+```
+
+### 4\. Ventanas temporales y lógica de agregación
+
+El núcleo del procesamiento consiste en agrupar los mensajes por hashtag dentro de ventanas temporales:
+
+*   **Ventana fija de 60 segundos**, alineada a minutos naturales (HH:MM:00,HH:MM:59HH:MM:00, HH:MM:59HH:MM:00,HH:MM:59).
+    
+*   **Watermark de 60 segundos** para descartar datos demasiado atrasados y controlar el estado interno de Spark.
+    
+*   Conteo de mensajes por cada hashtag\_principal.
+    
+
+La definición de la ventana es:
+
+```yaml
+windowed_counts = (
+    df_with_ts
+    .withWatermark("ts", "60 seconds")
+    .groupBy(
+        window(col("ts"), "60 seconds"),
+        col("hashtag_principal")
+    )
+    .agg(count("*").alias("num_ocurrencias"))
+)
+```
+
+A partir de ahí, se utiliza foreachBatch para procesar cada micro-batch de forma “estática”, ordenar y limitar los resultados:
+
+```yaml
+def process_batch(batch_df, batch_id):
+    if batch_df.isEmpty():
+        return
+
+
+    # Ventana más reciente disponible en este batch
+    max_end_row = batch_df.agg(max_("window.end").alias("max_end")).collect()[0]
+    max_end = max_end_row["max_end"]
+
+
+    if max_end is None:
+        return
+
+
+    latest_window_df = batch_df.filter(col("window.end") == max_end)
+
+
+    top_hashtags = (
+        latest_window_df
+        .orderBy(col("num_ocurrencias").desc())
+    )
+
+
+    print("\n========================================")
+    print(f"Batch {batch_id} - Snapshot en {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Ventana del minuto [{max_end - timedelta(seconds=60)} , {max_end}]")
+    print("Top hashtags en este minuto:")
+    top_hashtags.show(truncate=False)
+    print("========================================\n")
+  
+```
+
+Por último, se arranca el streaming con un **trigger de 10 segundos**:
+
+```yaml
+query = (
+    windowed_counts
+    .writeStream
+    .outputMode("update")
+    .foreachBatch(process_batch)
+    .trigger(processingTime="10 seconds")
+    .start()
+)
+
+
+query.awaitTermination()
+```
+
+Esto implica que cada ~10 segundos se recibe un nuevo lote (_batch_) con las actualizaciones y se imprime un nuevo snapshot del ranking.
+
+### 5\. Formato de salida e interpretación
+
+En ejecución, el consumidor genera bloques de salida de este estilo:
+
+```yaml
+========================================
+Batch 12 - Snapshot en 2025-12-16 00:31:20
+Ventana del minuto [2025-12-16 00:30:20 , 2025-12-16 00:31:20]
+Top hashtags en este minuto:
++-------------------+-----------------+---------------+
+|window             |hashtag_principal|num_ocurrencias|
++-------------------+-----------------+---------------+
+|{...}              |#BigData         |42             |
+|{...}              |#Spark           |35             |
+|{...}              |#Kafka           |18             |
++-------------------+-----------------+---------------+
+========================================
+```
+
+Interpretación:
+
+*   **Batch N**: número de actualización desde que se arrancó el consumidor.
+    
+*   **Snapshot en …**: momento en el que se ha generado ese resumen.
+    
+*   **Ventana del minuto t0,t1t0, t1t0,t1**: intervalo de 60 segundos que se está analizando.
+    
+*   La tabla muestra, para esa ventana de un minuto, cuántas veces ha aparecido cada hashtag (num\_ocurrencias), ordenados de mayor a menor.
+
+
+En términos conceptuales, esto equivale a un "trending topics del último minuto", recalculado y reimpreso de forma periódicacada 10 segundos.
 
 ## Documentación
 
