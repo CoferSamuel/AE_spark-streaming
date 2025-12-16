@@ -24,3 +24,8 @@ checkpoint/
 
 # Data - Archivos de datos generados
 data/
+docs/memoria.fls
+docs/memoria.aux
+docs/memoria.fdb_latexmk
+entrega.zip
+docs/memoria.synctex.gz

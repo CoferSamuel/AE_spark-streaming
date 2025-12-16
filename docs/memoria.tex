@@ -130,7 +130,13 @@ Streaming}\label{memoria-del-proyecto-spark-streaming}}
 \item
   \protect\hyperlink{documentaciuxf3n}{Documentación}
 \item
+  \protect\hyperlink{retos-y-soluciones-en-la-infraestructura}{Retos y Soluciones}
+\item
   \protect\hyperlink{conclusiones}{Conclusiones}
+\item
+  \protect\hyperlink{trabajo-futuro}{Trabajo Futuro}
+\item
+  \protect\hyperlink{bibliografuxeda-y-referencias}{Bibliografía y Referencias}
 \end{enumerate}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
@@ -145,7 +151,7 @@ los inyectamos en Kafka y los procesamos con Spark sobre una red de
 contenedores.
 
 Decidimos apartarnos de los temas propuestos en clase para darle al
-proyecto un enfoque más diferente, novedoso y moderno. Quisimos montar
+proyecto un enfoque más diferente, novedoso y moderno. El objetivo fue implementar
 una arquitectura realista basada en contenedores y Big Data, y eso es lo
 que se expone en este documento.
 
@@ -172,17 +178,17 @@ usamos?}\label{quuxe9-es-docker-y-por-quuxe9-lo-usamos}}
 Ligera''}\label{concepto-docker-como-muxe1quina-virtual-ligera}}
 
 Docker es una herramienta que permite \textbf{empaquetar aplicaciones
-con todas sus dependencias} en contenedores aislados. Imagina que Docker
-es como una caja de transporte hermética. Dentro de esa caja metemos:
+con todas sus dependencias} en contenedores aislados. Docker puede considerarse
+como un contenedor hermético de transporte. Este contenedor incluye:
 \begin{itemize}
 \item La aplicación (Kafka, Zookeeper, Spark)
 \item El sistema operativo mínimo que necesita
 \item Todas las librerías y configuraciones
 \end{itemize}
 
-\textbf{Ventaja:} Esa caja funciona igual en tu PC, en el del compañero,
-o en un servidor de producción. No importa si tienes Windows, Mac o
-Linux; Docker se encarga de la compatibilidad.
+\textbf{Ventaja:} El contenedor funciona de manera idéntica en cualquier entorno de desarrollo
+o en un servidor de producción. Independientemente del sistema operativo anfitrión (Windows, Mac o
+Linux), Docker gestiona la compatibilidad.
 
 \hypertarget{por-quuxe9-la-usamos-en-este-proyecto}{%
 \paragraph{¿Por qué la usamos en este
@@ -192,42 +198,41 @@ proyecto?}\label{por-quuxe9-la-usamos-en-este-proyecto}}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  \textbf{Reproducibilidad:} Todos los compañeros tienen el mismo
-  entorno exacto. No hay confusiones tipo ``a mí me funciona, ¿por qué a
-  ti no?''.
+  \textbf{Reproducibilidad:} Todo el equipo dispone del mismo
+  entorno exacto. Se evitan discrepancias de configuración entre entornos locales.
 \item
   \textbf{Aislamiento:} Kafka y Zookeeper corren en sus propios
-  contenedores sin interferir con tu sistema operativo.
+  contenedores sin interferir con el sistema operativo anfitrión.
 \item
   \textbf{Facilidad:} En lugar de instalar Java, descargar Kafka,
-  configurar todo manualmente (30 minutos de dolor), ejecutamos un
-  comando: \texttt{docker\ compose\ up\ -d}. ¡Listo en 10 segundos!
+  configurar todo manualmente (un proceso manual complejo y propenso a errores), ejecutamos un
+  comando: \texttt{docker\ compose\ up\ -d}. ¡Listo en cuestión de segundos!
 \item
-  \textbf{Escalabilidad:} Si necesitáramos 5 brokers de Kafka en lugar
-  de 1, solo cambiaríamos el archivo de configuración. Sin Docker, sería
-  una pesadilla.
+  \textbf{Escalabilidad:} Si fuera necesario utilizar 5 brokers de Kafka en lugar
+  de 1, solo se cambiaría el archivo de configuración. Sin Docker, sería
+  considerablemente más complejo.
 \end{enumerate}
 
 \hypertarget{arquitectura-de-docker-en-este-proyecto}{%
 \paragraph{Arquitectura de Docker en este
 Proyecto}\label{arquitectura-de-docker-en-este-proyecto}}
 
-La arquitectura se organiza de la siguiente manera: En tu ordenador
+La arquitectura se organiza de la siguiente manera: En el ordenador anfitrión
 (Host), Docker crea dos contenedores aislados: uno para Zookeeper y otro
 para Kafka. Estos dos contenedores están conectados entre sí mediante
 una red interna privada de Docker, lo que permite que se comuniquen
 directamente entre ellos sin interferencias.
 
-Sin embargo, para que tus aplicaciones Python (que corren en tu máquina
+Sin embargo, para que las aplicaciones Python (que corren en la máquina
 local, fuera de Docker) puedan hablar con Kafka y Zookeeper, estos
 contenedores \textbf{exponen puertos hacia el exterior}. Zookeeper
-escucha en el puerto \textbf{2181} (desde tu perspectiva, es
+escucha en el puerto \textbf{2181} (desde la perspectiva del host, es
 \texttt{localhost:2181}) y Kafka en el puerto \textbf{9092}
 (\texttt{localhost:9092}).
 
-De esta forma, tu código Python no necesita saber que estas aplicaciones
+De esta forma, el código Python no necesita saber que estas aplicaciones
 están dentro de contenedores; simplemente se conecta a
-\texttt{localhost:9092} como si estuvieran instaladas directamente en tu
+\texttt{localhost:9092} como si estuvieran instaladas directamente en la
 máquina. Docker maneja toda la magia de enrutamiento de red por debajo.
 
 \hypertarget{tecnologuxedas-implementadas-quuxe9-son-y-por-quuxe9-las-usamos}{%
@@ -241,7 +246,7 @@ clave que hemos desplegado utilizando contenedores Docker.
 \paragraph{A. Apache Zookeeper (El
 Coordinador)}\label{a.-apache-zookeeper-el-coordinador}}
 
-Imaginemos que Kafka es una gran oficina de correos. \textbf{Zookeeper}
+Kafka puede compararse con una gran oficina de correos. \textbf{Zookeeper}
 sería el gerente de esa oficina. No reparte cartas (mensajes), pero sabe
 quién está trabajando, qué ventanillas están abiertas y mantiene el
 orden.
@@ -258,17 +263,17 @@ Es el corazón del sistema de streaming. Funciona como una tubería de
 datos de altísima velocidad.
 \begin{itemize}
 \item \textbf{Concepto clave:} Desacoplamiento. El productor (Python) deja el mensaje en Kafka y se olvida. El consumidor (Spark) lo recoge cuando puede. No necesitan estar conectados directamente.
-\item \textbf{Topic:} Es como una ``carpeta'' o ``canal'' dentro de Kafka. Nosotros creamos uno llamado \texttt{tweets\_topic} donde se vuelcan todos los mensajes simulados.
+\item \textbf{Topic:} Es como una ``carpeta'' o ``canal'' dentro de Kafka. Se ha creado uno llamado \texttt{tweets\_topic} donde se vuelcan todos los mensajes simulados.
 \end{itemize}
 
 \hypertarget{despliegue-con-docker-compose}{%
 \subsubsection{2. Despliegue con Docker
 Compose}\label{despliegue-con-docker-compose}}
 
-En lugar de instalar Java, Kafka y Zookeeper manualmente en el ordenador
-de cada compañero (lo cual suele dar errores de versiones), creamos un
+En lugar de instalar Java, Kafka y Zookeeper manualmente en el entorno
+de desarrollo (lo cual suele dar errores de versiones), creamos un
 archivo \texttt{docker-compose.yml}. Este archivo es una ``receta'' que
-le dice a Docker cómo levantar todo el entorno con un solo comando.
+indica a Docker cómo levantar todo el entorno con un solo comando.
 
 \textbf{Fragmento del código de infraestructura
 (\texttt{docker-compose.yml}):}
@@ -303,7 +308,7 @@ le dice a Docker cómo levantar todo el entorno con un solo comando.
 \textbf{Explicación técnica:}
 \begin{itemize}
 \item \textbf{\texttt{depends\_on}}: Asegura que Kafka no arranque hasta que Zookeeper esté listo.
-\item \textbf{\texttt{KAFKA\_ADVERTISED\_LISTENERS}}: Este fue el mayor reto. Por defecto, Kafka anuncia su IP interna de Docker. Tuvimos que configurarlo para que anuncie \texttt{localhost:9092}, permitiendo así que los scripts de Python (que corren en el host, fuera de Docker)
+\item \textbf{\texttt{KAFKA\_ADVERTISED\_LISTENERS}}: Este fue el mayor reto. Por defecto, Kafka anuncia su IP interna de Docker. Fue necesario configurarlo para que anuncie \texttt{localhost:9092}, permitiendo así que los scripts de Python (que corren en el host, fuera de Docker)
 \end{itemize}
 puedan conectarse.
 
@@ -337,7 +342,7 @@ en segundo plano sin bloquear la terminal.}
 \texttt{zookeeper} están en estado \texttt{Up}.}
 
 \textbf{Paso 3: Creación del Topic (Canal de datos)} Una vez el sistema
-está arriba, hay que crear el canal donde viajarán los datos. Usamos
+está arriba, hay que crear el canal donde viajarán los datos. Se utiliza
 \texttt{docker\ exec} para ejecutar el comando de creación \emph{dentro}
 del contenedor de Kafka:
 
@@ -358,8 +363,8 @@ del contenedor de Kafka:
   usarán tanto el Productor como el Consumidor.
 \end{itemize}
 
-\textbf{Paso 4: Detener / Apagar la infraestructura} Cuando termines el
-desarrollo o quieras limpiar tu máquina, es importante detener los
+\textbf{Paso 4: Detener / Apagar la infraestructura} Al finalizar el
+desarrollo o para limpiar el entorno, es importante detener los
 contenedores. Existen dos formas:
 
 \textbf{Opción A: Detener sin eliminar (mantiene los datos)}
@@ -370,7 +375,7 @@ contenedores. Existen dos formas:
 \end{Highlighting}
 \end{Shaded}
 
-Los contenedores se pausan pero siguen existiendo. Puedes reanudarlos
+Los contenedores se pausan pero siguen existiendo. Se pueden reanudar
 con \texttt{docker\ compose\ ...\ start}.
 
 \textbf{Opción B: Detener y eliminar (limpieza total)}
@@ -388,8 +393,8 @@ Este comando:
 \item Libera la red de Docker.
 \end{itemize}
 
-\textbf{Nota importante:} Si utilizas volúmenes persistentes (datos
-almacenados en disco), agrégale el flag para eliminarlos también:
+\textbf{Nota importante:} Si se utilizan volúmenes persistentes (datos
+almacenados en disco), se debe agregar el flag para eliminarlos también:
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -503,7 +508,7 @@ reto fue alimentar el sistema. En una arquitectura Big Data, el
 ``pipeline'' o tubería de procesamiento no sirve de nada si no tiene un
 flujo de entrada constante.
 
-Mi misión como \textbf{Responsable de la Ingesta} fue crear la
+La función del \textbf{Responsable de la Ingesta} fue crear la
 ``realidad simulada'': un generador de tráfico que emule el
 comportamiento de usuarios de una red social (tipo Twitter/X) en tiempo
 real, garantizando que el clúster de Spark siempre tenga datos que
@@ -522,17 +527,17 @@ embargo, se optó por desarrollar un \textbf{Generador Sintético
 \tightlist
 \item
   \textbf{Independencia y Resiliencia:} Las APIs públicas tienen límites
-  de tasa (\emph{rate-limits}) y costes asociados. Un simulador nos
+  de tasa (\emph{rate-limits}) y costes asociados. Un simulador
   permite generar tráfico infinito sin bloqueos, asegurando que la
   demostración en vivo no falle por causas externas.
 \item
   \textbf{Control del Dato:} Para probar las capacidades de Spark
-  Streaming (agrupaciones y ventanas de tiempo), necesitábamos asegurar
+  Streaming (agrupaciones y ventanas de tiempo), era necesario asegurar
   que ciertos hashtags (ej: \texttt{\#Spark}) aparecieran con más
-  frecuencia que otros. Un generador sintético nos permite ``trucar''
+  frecuencia que otros. Un generador sintético permite ``ajustar''
   las probabilidades para hacer la demo más visual.
 \item
-  \textbf{Velocidad Ajustable:} Podemos acelerar o frenar el flujo de
+  \textbf{Velocidad Ajustable:} Es posible acelerar o frenar el flujo de
   datos modificando una simple variable de tiempo (\texttt{sleep}), algo
   imposible con datos reales.
 \end{enumerate}
@@ -553,7 +558,7 @@ simplicidad. El script se conecta al ``Broker'' expuesto por Docker en
 \texttt{localhost:9092}.
 
 Una decisión clave fue la \textbf{Serialización}. Kafka transmite bytes
-puros, por lo que el productor se encarga de transformar nuestros
+puros, por lo que el productor se encarga de transformar los
 objetos Python (diccionarios) a formato JSON y codificarlos en UTF-8
 antes del envío.
 
@@ -571,9 +576,9 @@ antes del envío.
 \paragraph{B. Estructura del Dato
 (Schema)}\label{b.-estructura-del-dato-schema}}
 
-Para facilitar el trabajo del \textbf{Consumidor (Persona C)}, diseñé un
+Para facilitar el trabajo del \textbf{Consumidor (Persona C)}, se diseñó un
 esquema de datos JSON limpio pero enriquecido. En lugar de enviar solo
-texto plano, enviamos una estructura estructurada:
+texto plano, se envía una estructura estructurada:
 
 \begin{itemize}
 \tightlist
@@ -583,8 +588,8 @@ texto plano, enviamos una estructura estructurada:
   \textbf{\texttt{texto}}: La frase completa (ej: ``estoy aprendiendo
   mucho con \#Spark'').
 \item
-  \textbf{\texttt{hashtag\_principal}}: Aquí apliqué una lógica de
-  pre-procesamiento. Aunque el hashtag está en el texto, lo envío
+  \textbf{\texttt{hashtag\_principal}}: Se aplicó una lógica de
+  pre-procesamiento. Aunque el hashtag está en el texto, se envía
   también en un campo separado. Esto permite a Spark hacer el
   \texttt{groupBy} directamente sin necesidad de expresiones regulares
   complejas, optimizando el rendimiento.
@@ -941,7 +946,7 @@ Interpretación:
 \end{itemize}
 
 En términos conceptuales, esto equivale a un ``trending topics del
-último minuto'', recalculado y reimpreso de forma periódicacada 10
+último minuto'', recalculado y reimpreso de forma periódica cada 10
 segundos.
 
 \newpage
@@ -1099,6 +1104,24 @@ De esta forma, se entrega no solo la documentación técnica exhaustiva
 la comunicación efectiva de los resultados.
 
 \newpage
+\hypertarget{retos-y-soluciones-en-la-infraestructura}{%
+\subsection{Retos y Soluciones}\label{retos-y-soluciones-en-la-infraestructura}}
+
+Durante la implementación de la infraestructura, el equipo se enfrentó a desafíos técnicos significativos que requirieron investigación y adaptación.
+
+\textbf{Compatibilidad de Imágenes Docker (Bitnami vs Confluent)}
+
+Uno de los mayores desafíos fue la compatibilidad de las imágenes de Docker. Inicialmente se intentó utilizar imágenes de Bitnami, pero surgieron conflictos con la arquitectura del procesador y las versiones de las librerías cliente.
+
+\textbf{Solución:} Se optó por migrar a las imágenes oficiales de \textbf{Confluent Inc.} (basadas en la plataforma Enterprise de Kafka). Además, fue necesario fijar versiones específicas (\emph{pinning versions}) en el archivo \texttt{docker-compose.yml} (versión \texttt{7.4.4}) en lugar de usar la etiqueta \texttt{latest}, garantizando así que todos los miembros del equipo trabajaran sobre la misma base binaria y evitando errores de "versión no encontrada" al desplegar en diferentes máquinas.
+
+\textbf{Gestión de Recursos y "OOM Kills"}
+
+Otro obstáculo fue el consumo de memoria en los ordenadores portátiles del equipo. Al levantar el stack completo, ocasionalmente el contenedor de Kafka se detenía abruptamente con el código de salida 137 (Out of Memory).
+
+\textbf{Solución:} Se optimizó la configuración de la Java Virtual Machine (JVM) dentro del contenedor. Mediante la variable de entorno \texttt{KAFKA\_HEAP\_OPTS}, se limitó la asignación de memoria a valores más conservadores (ej. "-Xmx512M -Xms512M"), logrando un equilibrio entre rendimiento y estabilidad para un entorno de desarrollo local.
+
+\newpage
 \hypertarget{conclusiones}{%
 \subsection{Conclusiones}\label{conclusiones}}
 
@@ -1115,9 +1138,32 @@ A diferencia de los enfoques tradicionales de procesamiento por lotes
 \item \textbf{Escalabilidad:} El uso de contenedores Docker facilita el despliegue y la escalabilidad horizontal de los servicios.
 \end{enumerate}
 
-En resumen, hemos logrado construir un pipeline completo de datos
+En resumen, se ha logrado construir un pipeline completo de datos
 (``End-to-End'') que no solo cumple con los requisitos académicos, sino
 que se acerca a las arquitecturas reales utilizadas en la industria para
 el análisis de redes sociales y eventos en vivo.
+
+\newpage
+\hypertarget{trabajo-futuro}{%
+\subsection{Trabajo Futuro}\label{trabajo-futuro}}
+
+Si se dispusiera de más tiempo para la evolución del proyecto, una mejora clave sería la integración de un sistema de visualización avanzado. Actualmente, los resultados se muestran por consola, pero sería ideal conectar la salida de Spark a un dashboard visual como \textbf{Grafana} o \textbf{Kibana}. Esto permitiría observar gráficas de tendencias en tiempo real, facilitando la toma de decisiones basada en datos de una manera mucho más intuitiva y profesional.
+
+\newpage
+\hypertarget{bibliografuxeda-y-referencias}{%
+\subsection{Bibliografía y Referencias}\label{bibliografuxeda-y-referencias}}
+
+Para el desarrollo de este proyecto, se ha consultado la documentación oficial de las tecnologías utilizadas, garantizando el uso de buenas prácticas y patrones de diseño estándar en la industria.
+
+\begin{itemize}
+\item
+  \textbf{Apache Kafka Documentation}: \url{https://kafka.apache.org/documentation/}
+\item
+  \textbf{Spark Structured Streaming Programming Guide}: \url{https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html}
+\item
+  \textbf{Docker Hub - Confluent Inc Images}: \url{https://hub.docker.com/u/confluentinc}
+\item
+  \textbf{Kafka-Python Library}: \url{https://kafka-python.readthedocs.io/en/master/}
+\end{itemize}
 
 \end{document}
