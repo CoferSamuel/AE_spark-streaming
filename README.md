@@ -1,174 +1,324 @@
-# 🚀 Proyecto Big Data: Simulador de Streaming (Kafka + Spark)
+# 🚀 Real-Time Big Data Streaming Architecture (Kafka + PySpark)
 
-Este proyecto implementa una arquitectura de **Big Data en Tiempo Real**. Simulamos un flujo de datos de una red social (tipo Twitter/X) para procesar tendencias (Trending Topics) al instante.
+[![Python 3.9+](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-24.0+-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-7.4.4-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
+[![Apache Spark](https://img.shields.io/badge/Apache_Spark-3.5+-E25A1C?style=for-the-badge&logo=apachespark&logoColor=white)](https://spark.apache.org/)
+[![Status](https://img.shields.io/badge/Status-Operational-brightgreen?style=for-the-badge)]()
 
-La arquitectura se basa en un **Clúster de un solo nodo (Single-Node Cluster)** virtualizado con Docker.
+An end-to-end, enterprise-grade **Real-Time Data Streaming Pipeline** designed to simulate social media traffic (Twitter/X) and process live **Trending Topics** instantaneously. Built on top of a single-node virtualised container cluster (Docker Compose), this project decouples continuous data ingestion from micro-batch stream aggregation using **Apache Kafka** and **PySpark Structured Streaming**.
 
------
+---
 
-## 📋 Estructura del Proyecto
+## 📌 Table of Contents
 
-Antes de tocar nada, entiende qué es cada carpeta y archivo:
+- [Project Purpose \& Key Features](#-project-purpose--key-features)
+- [Team Structure \& Responsibilities](#-team-structure--responsibilities)
+- [System Architecture \& Data Flow](#-system-architecture--data-flow)
+- [Data Schema \& Message Payload](#-data-schema--message-payload)
+- [Directory Hierarchy](#-directory-hierarchy)
+- [Prerequisites \& Environment Setup](#-prerequisites--environment-setup)
+- [Step-by-Step Deployment \& Execution](#-step-by-step-deployment--execution)
+- [Verification \& Health Testing](#-verification--health-testing)
+- [Dual-Layer Architecture (Scripts vs. Notebook)](#-dual-layer-architecture-scripts-vs-notebook)
+- [Troubleshooting \& Infrastructure Teardown](#-troubleshooting--infrastructure-teardown)
+- [Conclusions \& Batch vs. Streaming Analysis](#-conclusions--batch-vs-streaming-analysis)
 
-  * **`docker/docker-compose.yml`**: 🏗️ **Infraestructura.** Define los servicios Zookeeper y Kafka y cómo se conectan. Docker lee este archivo para levantar toda la infraestructura automáticamente.
-  * **`src/producer/`**: 📤 **Productor.** Código fuente para simular el envío de mensajes (tweets).
-  * **`src/consumer/`**: 📥 **Consumidor.** Código fuente para procesar los mensajes (Spark, etc.).
-  * **`src/utils/`**: 🛠️ **Utilidades.** Funciones auxiliares y configuración.
-  * **`tests/tester.py`**: 🧪 **Test.** Script de prueba para verificar la conexión con Kafka.
-  * **`data/`**: 📁 **Datos.** Guarda ejemplos pequeños, dumps o logs que uses para pruebas locales.
-  * **`requirements.txt`**: 📦 **Dependencias versionadas.** La lista que usamos dentro del entorno `arqesp`.
-  * **`.gitignore`**: 🗑️ **Filtro.** Archivos ignorados por Git.
-  * **`README.md`**: 📖 **Documentación principal.**
+---
 
------
+## 🎯 Project Purpose & Key Features
 
-## 🌳 Árbol de directorios
+Modern enterprise data architectures rely on **Streaming Processing** to gain actionable insights within seconds rather than processing static batches overnight. This project demonstrates a production-oriented Lambda/Kappa streaming layer:
+
+- **Decoupled Architecture:** High-throughput producer writes synthetic events to Kafka without blocking; PySpark consumes events asynchronously.
+- **Resilient Containerisation:** Fully virtualised cluster deploying Zookeeper and Kafka via Docker Compose with external port mapping.
+- **Tumbling Time-Window Aggregations:** PySpark Structured Streaming groups event streams into 60-second fixed windows recalculated every 10 seconds.
+- **Watermarking & Late Data Handling:** 2-minute event watermark to discard out-of-order/stale messages efficiently.
+- **Dual Execution Modes:** Clean modular Python scripts (`src/`) for production deployment alongside an interactive Jupyter Notebook (`entrega/notebook.ipynb`) for academic presentation.
+
+---
+
+## 👥 Team Structure & Responsibilities
+
+| Contributor | Specialized Role | Primary Focus & Deliverables |
+| :--- | :--- | :--- |
+| **Samuel Corrionero** | **Infrastructure Architect** | Docker virtualization, Zookeeper & Kafka networking, port-forwarding (`KAFKA_ADVERTISED_LISTENERS`), system health tester script. |
+| **Ismael González Loro** | **Data Ingestion Engineer** | Synthetic social media generator (`src/productor.py`), JSON serialization, randomized distribution logic, and rate throttling. |
+| **Jairo Pabel Farfán Callau**| **Spark Streaming Engineer** | PySpark consumer (`src/spark_consumer.py`), StructType schema definition, 60s tumbling windows, 2m watermarks, `foreachBatch` output. |
+| **Yahya El Baroudi** | **Documentation Lead** | Master presentation notebook (`notebook.ipynb`), subprocess orchestration, live HTML display tables, defense presentation slides. |
+
+---
+
+## 🏗️ System Architecture & Data Flow
+
+The following sequence details how synthetic social media traffic flows from Python through Dockerized Kafka into PySpark for windowed trending topic computation:
+
+```mermaid
+flowchart TD
+    subgraph Host ["💻 Host Machine (Local Environment)"]
+        PROD["🐦 Data Producer (src/productor.py)\nSynthetic Tweets Generator"]
+        SPARK["🔥 Spark Consumer (src/spark_consumer.py)\nPySpark Structured Streaming"]
+        TEST["🧪 System Tester (tests/tester.py)\nHealth Check Diagnostic"]
+    end
+
+    subgraph Docker ["🐳 Docker Virtual Network"]
+        ZK["🐘 Apache Zookeeper\nContainer: zookeeper:2181"]
+        KAFKA["📨 Apache Kafka Broker\nContainer: kafka:9092\nTopic: tweets_topic"]
+    end
+
+    PROD -->|1. JSON Encoded UTF-8 Bytes| KAFKA
+    ZK <--->|Cluster Metadata Management| KAFKA
+    KAFKA -->|2. Micro-batch Stream Reading| SPARK
+    SPARK -->|3. 60s Window Aggregation| SPARK
+    SPARK -->|4. Live Trending Topics Display| CONSOLE["📊 Terminal Console / HTML Table"]
+    TEST -.->|Diagnostic Ping| KAFKA
+```
+
+### Component Details
+
+1. **Apache Zookeeper (`localhost:2181`):** Coordinates broker leader election, maintains configuration states, and tracks node health.
+2. **Apache Kafka Broker (`localhost:9092`):** Serves as a high-speed buffer storing incoming streaming messages under topic `tweets_topic`. Configured with `PLAINTEXT://localhost:9092` advertised listeners so external host Python scripts can communicate seamlessly with containerised services.
+3. **Synthetic Producer (`src/productor.py`):** Generates 1 tweet/second simulating user handles, tweet text, primary hashtag, and precise timestamps.
+4. **Spark Structured Streaming (`src/spark_consumer.py`):** Reads micro-batches, parses JSON payload against an explicit schema, creates a 60-second tumbling time window, applies a 2-minute watermark, and outputs the top trending hashtags ordered by frequency.
+
+---
+
+## 📄 Data Schema & Message Payload
+
+### 1. JSON Payload Structure (Producer Output)
+
+Each event published to `tweets_topic` follows a clean, structured JSON format:
+
+```json
+{
+  "usuario": "@SparkGuru",
+  "texto": "increíble la velocidad de #Spark",
+  "hashtag_principal": "#Spark",
+  "timestamp": 1733940000.125
+}
+```
+
+### 2. PySpark StructType Schema (Consumer Input)
+
+To ensure zero schema drift and optimal parsing performance, the Spark Consumer enforces an explicit structure:
+
+```python
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+
+schema = StructType([
+    StructField("usuario", StringType(), True),
+    StructField("texto", StringType(), True),
+    StructField("hashtag_principal", StringType(), True),
+    StructField("timestamp", DoubleType(), True)
+])
+```
+
+---
+
+## 🌳 Directory Hierarchy
 
 ```text
 AE_spark-streaming/
-│
 ├── docker/
-│   └── docker-compose.yml
+│   └── docker-compose.yml       # Docker infrastructure recipe (Zookeeper + Kafka)
+├── docs/
+│   ├── memoria.md               # Complete project memory report (Markdown)
+│   ├── memoria.pdf              # Generated academic report (PDF)
+│   └── memoria.tex              # LaTeX source code for report
+├── entrega/
+│   ├── memoria.pdf              # Final submission document
+│   ├── notebook.ipynb           # Master Jupyter Notebook (Interactive presentation)
+│   └── Presentación .pdf        # Defense slides presentation
 ├── src/
-│   ├── producer/
-│   ├── consumer/
-│   └── utils/
+│   ├── productor.py             # Synthetic Twitter data producer script
+│   └── spark_consumer.py        # PySpark Structured Streaming consumer script
 ├── tests/
-│   └── tester.py
-├── data/
-├── requirements.txt
-├── README.md
-└── .gitignore
+│   └── tester.py                # Infrastructure & Kafka connection tester
+├── data/                        # Local data directory for dumps/logs
+├── requirements.txt             # Python dependencies manifest
+├── README.md                    # Project documentation (English)
+└── .gitignore                   # Git exclusion configuration
 ```
 
------
+---
 
-## 🛠️ Requisitos Previos
+## ⚙️ Prerequisites & Environment Setup
 
-Necesitas tener instalado en tu máquina:
+### 1. System Requirements
 
-1.  **Docker & Docker Compose**: El motor que ejecutará los servidores.
-2.  **Python 3.9+**: Recomendamos usar **Anaconda/Miniconda**.
-3.  **Git**: Para descargar este código.
+- **Operating System:** Linux / macOS / Windows 10+ (WSL2 recommended)
+- **Docker Desktop / Docker Engine:** Version 24.0+
+- **Java Runtime Environment (JRE/JDK):** Java 11 or 17 (Required by PySpark JVM)
+- **Conda / Python:** Python 3.9+
 
------
+### 2. Python Environment Installation
 
-## 🚀 Instalación y Puesta en Marcha
-
-Sigue estos pasos en orden exacto.
-
-### 1\. Clonar el repositorio
-
-Descarga el código a tu máquina:
+It is strongly recommended to set up an isolated Conda environment:
 
 ```bash
-git clone <URL_DEL_REPOSITORIO>
-cd spark-streaming-project
-```
-
-### 2\. Preparar el entorno Python
-
-Vamos a crear un entorno limpio para no mezclar librerías (es recomendable usar conda, pero no es necesario).
-
-```bash
-# Crear entorno llamado 'arqesp'
+# Create dedicated environment named 'arqesp'
 conda create --name arqesp python=3.9 -y
 
-# Activar el entorno
+# Activate the environment
 conda activate arqesp
 
-# Instalar las dependencias versionadas del proyecto
+# Install explicit project dependencies
 pip install -r requirements.txt
 ```
 
-Además asegúrate de que Java 11 o 17 esté instalada y disponible en `PATH`, ya que PySpark necesita la JVM para arrancar.
+---
 
-### 3\. Levantar la Infraestructura (Docker)
+## 🚀 Step-by-Step Deployment & Execution
 
-Este comando descargará las imágenes y encenderá Zookeeper y Kafka en segundo plano.
+Follow these steps in exact order to launch the full streaming pipeline.
+
+### Step 1: Spin Up Infrastructure (Docker)
+
+Launch Zookeeper and Kafka containers in detached mode:
 
 ```bash
-# Si estás en Linux/Mac y requiere permisos, usa 'sudo' delante
+# Navigate to project root directory
 cd docker
-sudo docker compose up -d
+docker compose up -d
 ```
 
-*Espera unos segundos hasta que diga "Started" o "Running".*
-
-### 4\. Crear el Canal de Comunicación (Topic)
-
-**⚠️ IMPORTANTE:** Este paso solo es necesario hacerlo **una vez** (la primera vez que arrancas el sistema). Creamos el "buzón" donde se guardarán los tweets.
+Verify that both containers are active (`Up` state):
 
 ```bash
-sudo docker compose exec kafka kafka-topics --create --topic tweets_topic --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1
+docker ps
 ```
 
-*Si sale bien, dirá: `Created topic tweets_topic`.*
+### Step 2: Create Kafka Topic (`tweets_topic`)
 
------
+*(Required only once during initial setup)*
 
-## ✅ Verificar que todo funciona
+```bash
+docker exec -it kafka kafka-topics --create \
+    --bootstrap-server localhost:9092 \
+    --replication-factor 1 \
+    --partitions 1 \
+    --topic tweets_topic
+```
 
-Para asegurarte de que tu ordenador puede hablar con el Kafka que vive dentro de Docker, hemos creado un script de prueba.
+### Step 3: Run Diagnostic Test
 
-Asegúrate de tener el entorno activado (`conda activate arqesp`) y ejecuta:
+Verify host-to-container connectivity before starting the producer or consumer:
+
+```bash
+# From project root directory
+python tests/tester.py
+```
+
+*Expected Output:* You should see `[✔] Sent` and `[✔] Received` messages confirming Kafka is ready.
+
+### Step 4: Launch the Data Producer
+
+Open a terminal window (with `arqesp` activated) and run:
+
+```bash
+python src/productor.py
+```
+
+*The producer will begin emitting 1 synthetic tweet per second into Kafka.*
+
+### Step 5: Launch the Spark Streaming Consumer
+
+Open **another** terminal window (with `arqesp` activated) and execute:
+
+```bash
+python src/spark_consumer.py
+```
+
+Every **10 seconds**, Spark will process accumulated micro-batches and render a live snapshot of top trending hashtags over the current 60-second window:
+
+```text
+========================================
+Batch 4 - Snapshot at 2025-12-16 10:15:30
+Window interval [10:14:30 , 10:15:30]
+Top hashtags in this minute:
++-------------------+-----------------+---------------+
+|window             |hashtag_principal|num_ocurrencias|
++-------------------+-----------------+---------------+
+|{...}              |#Spark           |24             |
+|{...}              |#BigData         |18             |
+|{...}              |#RealTime        |14             |
+|{...}              |#Python          |9              |
++-------------------+-----------------+---------------+
+========================================
+```
+
+---
+
+## 🧪 Verification & Health Testing
+
+The system includes a dedicated verification script (`tests/tester.py`) that acts as a full-loop diagnostic:
+
+1. **Producer Check:** Sends 5 test JSON messages to `tweets_topic` on `localhost:9092`.
+2. **Consumer Check:** Instantiates a temporary Kafka consumer reading from `earliest` offset to confirm message persistence and retrieval.
 
 ```bash
 python tests/tester.py
 ```
 
-Si ves mensajes con **[✔] Enviado** y **[✔] Recibido**, ¡felicidades\! Tu entorno está listo para empezar a desarrollar.
+If any connection fails, the diagnostic script reports exact network status and troubleshooting hints.
 
------
+---
 
-## ℹ️ Datos Técnicos (Para configuración)
+## 🎓 Dual-Layer Architecture (Scripts vs. Notebook)
 
-Si necesitas configurar tus scripts (Producer o Spark), usa estos datos:
+To balance production software standards with academic presentation guidelines, this project employs a **Dual-Layer Strategy**:
 
-  * **Servidor Kafka (Bootstrap Server):** `localhost:9092`
-  * **Nombre del Topic:** `tweets_topic`
-  * **Zookeeper (Interno):** Puerto 2181
+```mermaid
+graph LR
+    subgraph Production ["🏭 Production Layer (src/)"]
+        P1["productor.py\nPure Python Daemon"]
+        C1["spark_consumer.py\nPySpark Production Script"]
+    end
 
------
+    subgraph Presentation ["🎓 Presentation Layer (entrega/)"]
+        NB["notebook.ipynb\nMaster Interactive Notebook"]
+    end
 
-## 🛑 Cómo detener todo
-
-Cuando termines de trabajar, no dejes los contenedores consumiendo RAM. Apágalos con:
-
-```bash
-cd docker
-sudo docker compose down
+    Production <-->|Imported & Executed via Subprocess| Presentation
 ```
 
------
+- **Production Layer (`src/`):** Contains modular, clean `.py` scripts optimized for continuous execution on headless servers or Kubernetes nodes.
+- **Presentation Layer (`entrega/notebook.ipynb`):** A master Jupyter Notebook that controls Docker container startup using shell commands (`!docker compose`), runs the data generator asynchronously via `subprocess`, and renders live updating pandas HTML tables of Trending Topics using `IPython.display`.
 
-*Arquitectura configurada por la Persona A.*
+---
 
------
+## 🛠️ Troubleshooting & Infrastructure Teardown
 
-## 🐦 Módulo: Generador de Datos (Producer)
+### Common Issues & Solutions
 
-**Estado:** ✅ Implementado por Persona B.
+1. **Port Binding Conflict (`port 9092 already in use`):**
+   Ensure local Kafka or another service is not occupying port 9092. Stop conflicting processes or run `docker compose down`.
+2. **PySpark JVM Error (`Java not found`):**
+   Ensure Java 11 or 17 JDK is installed and `JAVA_HOME` is configured in system variables.
+3. **Kafka Host Connectivity Timeout:**
+   Confirm `KAFKA_ADVERTISED_LISTENERS` in `docker/docker-compose.yml` is set to `PLAINTEXT://localhost:9092`.
 
-Este módulo sustituye a la API real de Twitter/X. Su función es generar **tráfico sintético** constante para asegurar que siempre haya datos entrando al sistema durante la demostración, evitando bloqueos por límites de API o pagos.
+### Infrastructure Teardown Commands
 
-### 🏃🏻‍♂️ Cómo ejecutar el simulador
+When finishing work, stop the container cluster to free system memory:
 
-Una vez levantada la infraestructura (Docker), abre una terminal nueva y ejecuta:
+```bash
+# Graceful stop (persists container state)
+docker compose -f docker/docker-compose.yml stop
 
-# Desde la raíz del proyecto
-python src/producer/producer.py
+# Complete cleanup (removes containers and Docker networks)
+docker compose -f docker/docker-compose.yml down -v
+```
 
----------------------------------------------------------------------
-INSTRUCCIONES DE VERIFICACIÓN RÁPIDA
----------------------------------------------------------------------
-Si queréis comprobar que mi parte funciona sin arrancar Spark todavía:
+---
 
-1. Abrid una terminal en la raíz del proyecto y lanzad mi script:
-   Command: python src/producer/producer.py
+## 📊 Conclusions & Batch vs. Streaming Analysis
 
-2. Abrid OTRA terminal para ver lo que llega a Kafka (Buzón):
-   Command: docker exec -it kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic tweets_topic --from-beginning
+| Feature | Traditional Batch (Hive / Pig / MapReduce) | Real-Time Streaming (Kafka + PySpark) |
+| :--- | :--- | :--- |
+| **Latency** | Hours / Days (Scheduled jobs) | Seconds / Sub-second (Continuous micro-batches) |
+| **Data Processing** | Finite, static datasets | Infinite, unbounded event streams |
+| **System Coupling** | High dependency on static storage | Fully decoupled via Kafka message broker |
+| **Use Case Fit** | Historical reporting, monthly billing | Live trend detection, fraud prevention, alerts |
 
-NOTA: El paso 2 es solo para testear. Cuando la Persona C tenga el código de Spark listo, 
-usaremos Spark para leer, no este comando de consola.
+This architecture successfully validates how modern Big Data systems capture, transport, and analyze high-velocity event streams with low latency and high fault tolerance.
